@@ -9,101 +9,106 @@ from pathlib import Path
 @st.cache_data
 def load_data():
     """
-    This function loads our CSV file named 'summary_data.csv'.
-    It also does basic data type conversions to ensure we can work
-    easily with numeric columns like CreatedWeek, Sum_session_count,
-    and Avg_week_txn_counts.
+    This function loads our CSV file named 'summary_data.csv' and converts
+    the relevant columns to numeric types. We also parse 'session_date'
+    as a datetime if needed for future operations.
     """
     DATA_FILENAME = Path(__file__).parent / "data/summary_data.csv"
     df = pd.read_csv(DATA_FILENAME)
     
-    # Parse session_date as datetime, in case you need it later
+    # Convert session_date to datetime
     df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce')
     
-    # Convert columns from string to numeric if needed
-    df['CreatedMonth'] = pd.to_numeric(df['CreatedMonth'], errors='coerce')
-    df['CreatedWeek'] = pd.to_numeric(df['CreatedWeek'], errors='coerce')
-    df['Sum_session_count'] = pd.to_numeric(df['Sum_session_count'], errors='coerce')
-    df['Avg_week_txn_counts'] = pd.to_numeric(df['Avg_week_txn_counts'], errors='coerce')
+    # Convert key columns from string to numeric if needed
+    df['session_month'] = pd.to_numeric(df['session_month'], errors='coerce')
+    df['session_week']  = pd.to_numeric(df['session_week'],  errors='coerce')
+    df['session_count'] = pd.to_numeric(df['session_count'], errors='coerce')
+    df['week_txn_counts'] = pd.to_numeric(df['week_txn_counts'], errors='coerce')
     
     return df
 
 # --------------------------------------------------------------------
-# 2. SETUP STREAMLIT APP
+# 2. SETUP STREAMLIT APP & INTRO
 # --------------------------------------------------------------------
-st.set_page_config(
-    page_title="Week-wise Contact Ratio",
-    layout="wide"
-)
-
+st.set_page_config(page_title="Week-wise Contact Ratio", layout="wide")
 df = load_data()
 
-# Page title and explanation
 st.title("Week-wise Contact Ratio Dashboard")
-st.markdown("""
-Use this dashboard to see how contact ratio changes from **week to week**.
 
-The **contact ratio** formula is:
+st.markdown("""
+We have **daily data** with columns like `session_week`, and we want to 
+**aggregate** those days to display a **single entry per week**.
+
+**Formula** for the Contact Ratio:
 
 \\[
-\\text{Contact Ratio} = 1{,}000{,}000 \\times \\frac{\\text{Sum\\_session\\_count}}{\\text{Avg\\_week\\_txn\\_counts}}
+\\text{Contact Ratio} = 1{,}000{,}000 \\times \\frac{\\sum(\\text{session\\_count})}{\\text{mean}(\\text{week\\_txn\\_counts})}
 \\]
 
-Below, choose the minimum and maximum **week numbers** you'd like to analyze.
+Select a range of **session_week** values below to view the weekly totals.
 """)
 
 # --------------------------------------------------------------------
 # 3. USER INPUT: WEEK RANGE
 # --------------------------------------------------------------------
-min_week_in_data = int(df['CreatedWeek'].min())
-max_week_in_data = int(df['CreatedWeek'].max())
+min_week_in_data = int(df['session_week'].min())
+max_week_in_data = int(df['session_week'].max())
 
 min_week, max_week = st.slider(
-    "Select CreatedWeek range:",
+    "Select the session_week range:",
     min_value=min_week_in_data,
     max_value=max_week_in_data,
     value=(min_week_in_data, max_week_in_data)
 )
 
-# Filter the data by the selected week range
+# Filter data to only keep rows within the chosen week range
 filtered_df = df[
-    (df['CreatedWeek'] >= min_week) & 
-    (df['CreatedWeek'] <= max_week)
+    (df['session_week'] >= min_week) &
+    (df['session_week'] <= max_week)
 ].copy()
 
 # --------------------------------------------------------------------
-# 4. CALCULATE CONTACT RATIO
+# 4. GROUP DATA BY WEEK & CALCULATE CONTACT RATIO
 # --------------------------------------------------------------------
-# For each row: contact_ratio = 1,000,000 * (Sum_session_count / Avg_week_txn_counts)
-filtered_df['contact_ratio'] = (
-    1_000_000 * 
-    (filtered_df['Sum_session_count'] / filtered_df['Avg_week_txn_counts'])
+#   - Summation for 'session_count' 
+#   - Mean for 'week_txn_counts'
+#   - Contact Ratio:
+#       contact_ratio = 1,000,000 * sum_session / avg_week_txn
+
+grouped_df = filtered_df.groupby('session_week', as_index=False).agg(
+    sum_session=('session_count', 'sum'),
+    avg_week_txn=('week_txn_counts', 'mean')
+)
+
+grouped_df['contact_ratio'] = (
+    1_000_000 * grouped_df['sum_session'] / grouped_df['avg_week_txn']
 )
 
 # --------------------------------------------------------------------
-# 5. DISPLAY FILTERED RESULTS
+# 5. DISPLAY RESULTS
 # --------------------------------------------------------------------
-st.subheader("Filtered Results")
-st.write(
-    "Below table shows rows in the selected week range, including the computed 'contact_ratio'."
-)
-st.dataframe(filtered_df)
+st.subheader("Weekly Aggregated Table")
+st.write("""
+Below, each row corresponds to a **single session_week** after aggregation.
+We show:
+- sum_session (total of daily session_count)
+- avg_week_txn (average of daily week_txn_counts)
+- contact_ratio (calculated via the formula above)
+""")
+
+grouped_df.sort_values(by='session_week', inplace=True)
+st.dataframe(grouped_df)
 
 # --------------------------------------------------------------------
-# 6. PLOT A CHART OF CONTACT RATIO BY WEEK
+# 6. VISUALIZE THE CONTACT RATIO
 # --------------------------------------------------------------------
-st.subheader("Contact Ratio by CreatedWeek")
+st.subheader("Contact Ratio by session_week")
 
-# To avoid decimal ticks, we convert week numbers to string.
-# We'll create a separate column so the original numeric data is preserved.
-filtered_df['WeekStr'] = filtered_df['CreatedWeek'].astype(int).astype(str)
+# Convert session_week to string to ensure no decimals when zooming
+grouped_df['WeekStr'] = grouped_df['session_week'].astype(int).astype(str)
 
-# Sort based on numeric value of the week before converting to string (so it sorts in actual numeric order).
-filtered_df.sort_values(by='CreatedWeek', inplace=True)
-
-# Now we can plot with 'WeekStr' as x-axis, which will remain constant (no decimals).
 st.line_chart(
-    data=filtered_df,
+    data=grouped_df,
     x='WeekStr',
     y='contact_ratio',
     height=400
@@ -111,7 +116,7 @@ st.line_chart(
 
 st.markdown("""
 **Interpretation:**
-- The x-axis shows each `CreatedWeek` as a category (string), so no decimals appear.
-- The y-axis (contact ratio) is scaled by 1,000,000 to avoid small fractional values.
-- This chart helps you see how contact ratio changes from one week to another within your chosen range.
+- The x-axis shows each `session_week` as a category (string), so no decimals appear.
+- The y-axis is the aggregated contact ratio, where each point represents 
+  the combined daily data for that week.
 """)
