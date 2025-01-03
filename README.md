@@ -40,7 +40,9 @@ If you have different column names or file paths, **update** the `load_data()` f
 ## 4. How Contact Ratio is Calculated
 For both weekly and daily aggregations, we use the formula:
 
-$\text{contact_ratio} = 1{,}000{,}000 \times \frac{\sum(\text{session_count})}{\text{mean}(\text{week_txn_counts})}$
+<details> <summary>Click to view formula</summary>
+contact_ratio = 1,000,000 * ( sum(session_count) / mean(week_txn_counts) )
+</details>
 
 - **Weekly Aggregation**: All daily rows for a given `session_week` are summed (for session counts) and averaged (for `week_txn_counts`), then plugged into the formula.
 - **Daily Aggregation**: Rows are grouped by `session_date`. Each date’s session counts are summed, and `week_txn_counts` is averaged for that date.
