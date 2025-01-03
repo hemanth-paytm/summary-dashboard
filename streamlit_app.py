@@ -13,10 +13,10 @@ def load_data():
     df = pd.read_csv(DATA_FILENAME)
     
     # Convert session_date to datetime
-    df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce')
+    #df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce').dt.date
 
     # Convert session_date to date
-    #df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce').dt.date
+    df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce').dt.date
 
     # Convert key columns from string to numeric if needed
     df['session_month'] = pd.to_numeric(df['session_month'], errors='coerce')
@@ -32,7 +32,7 @@ def load_data():
 st.set_page_config(page_title="Week-wise Contact Ratio", layout="wide")
 df = load_data()
 
-st.title("Week-wise vs. Date-wise Contact Ratio Dashboard")
+st.title("Contact Ratio Dashboard - Weekly + Daily")
 
 # --------------------------------------------------------------------
 # 3. USER INPUT: WEEK RANGE
@@ -115,7 +115,7 @@ st.line_chart(
 # 6. TABULAR VIEWS
 # --------------------------------------------------------------------
 
-st.subheader("Weekly & Daily Data Tables")
+#st.subheader("Weekly & Daily Data Tables")
 
 # Remove columns, display tables in a vertical layout
 st.write("**Weekly Aggregation**")
