@@ -1,7 +1,5 @@
 # :earth_americas: Contact Ratio Dashboard - Weekly + Daily
 
-# Contact Ratio Dashboard (Weekly + Daily)
-
 This dashboard uses **Streamlit** to display weekly and daily **contact ratio** data. Follow the steps below to set it up and run it.
 
 ---
@@ -42,9 +40,7 @@ If you have different column names or file paths, **update** the `load_data()` f
 ## 4. How Contact Ratio is Calculated
 For both weekly and daily aggregations, we use the formula:
 
-$$
-\text{contact_ratio} = 1{,}000{,}000 \times \frac{\sum(\text{session_count})}{\text{mean}(\text{week_txn_counts})}
-$$
+$\text{contact_ratio} = 1{,}000{,}000 \times \frac{\sum(\text{session_count})}{\text{mean}(\text{week_txn_counts})}$
 
 - **Weekly Aggregation**: All daily rows for a given `session_week` are summed (for session counts) and averaged (for `week_txn_counts`), then plugged into the formula.
 - **Daily Aggregation**: Rows are grouped by `session_date`. Each date’s session counts are summed, and `week_txn_counts` is averaged for that date.
