@@ -8,17 +8,16 @@ from pathlib import Path
 # --------------------------------------------------------------------
 @st.cache_data
 def load_data():
-    """
-    This function loads our CSV file named 'summary_data.csv' and converts
-    the relevant columns to numeric types. We also parse 'session_date'
-    as a datetime if needed for future operations.
-    """
-    DATA_FILENAME = Path(__file__).parent / "data/summary_data.csv"
+
+    DATA_FILENAME = Path(__file__).parent / "data/summary_data_1.csv"
     df = pd.read_csv(DATA_FILENAME)
     
     # Convert session_date to datetime
-    df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce')
-    
+    #df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce')
+
+    # Convert session_date to date
+    df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce').dt.date
+
     # Convert key columns from string to numeric if needed
     df['session_month'] = pd.to_numeric(df['session_month'], errors='coerce')
     df['session_week']  = pd.to_numeric(df['session_week'],  errors='coerce')
@@ -33,20 +32,7 @@ def load_data():
 st.set_page_config(page_title="Week-wise Contact Ratio", layout="wide")
 df = load_data()
 
-st.title("Week-wise Contact Ratio Dashboard")
-
-st.markdown("""
-We have **daily data** with columns like `session_week`, and we want to 
-**aggregate** those days to display a **single entry per week**.
-
-**Formula** for the Contact Ratio:
-
-\\[
-\\text{Contact Ratio} = 1{,}000{,}000 \\times \\frac{\\sum(\\text{session\\_count})}{\\text{mean}(\\text{week\\_txn\\_counts})}
-\\]
-
-Select a range of **session_week** values below to view the weekly totals.
-""")
+st.title("Week-wise vs. Date-wise Contact Ratio Dashboard")
 
 # --------------------------------------------------------------------
 # 3. USER INPUT: WEEK RANGE
@@ -68,55 +54,72 @@ filtered_df = df[
 ].copy()
 
 # --------------------------------------------------------------------
-# 4. GROUP DATA BY WEEK & CALCULATE CONTACT RATIO
+# 4. WEEKLY AGGREGATION & CHART
 # --------------------------------------------------------------------
-#   - Summation for 'session_count' 
-#   - Mean for 'week_txn_counts'
-#   - Contact Ratio:
-#       contact_ratio = 1,000,000 * sum_session / avg_week_txn
+st.subheader("1) Weekly Contact Ratio Chart")
 
-grouped_df = filtered_df.groupby('session_week', as_index=False).agg(
+# Group daily rows by session_week
+weekly_df = filtered_df.groupby('session_week', as_index=False).agg(
     sum_session=('session_count', 'sum'),
     avg_week_txn=('week_txn_counts', 'mean')
 )
 
-grouped_df['contact_ratio'] = (
-    1_000_000 * grouped_df['sum_session'] / grouped_df['avg_week_txn']
+# Calculate contact ratio for each week
+weekly_df['contact_ratio'] = (
+    1_000_000 * weekly_df['sum_session'] / weekly_df['avg_week_txn']
 )
 
-# --------------------------------------------------------------------
-# 5. DISPLAY RESULTS
-# --------------------------------------------------------------------
-st.subheader("Weekly Aggregated Table")
-st.write("""
-Below, each row corresponds to a **single session_week** after aggregation.
-We show:
-- sum_session (total of daily session_count)
-- avg_week_txn (average of daily week_txn_counts)
-- contact_ratio (calculated via the formula above)
-""")
+# Sort weeks in ascending order
+weekly_df.sort_values(by='session_week', ascending=False, inplace=True)
 
-grouped_df.sort_values(by='session_week', inplace=True)
-st.dataframe(grouped_df)
+# Convert session_week to string to avoid decimals on x-axis
+weekly_df['WeekStr'] = weekly_df['session_week'].astype(int).astype(str)
 
-# --------------------------------------------------------------------
-# 6. VISUALIZE THE CONTACT RATIO
-# --------------------------------------------------------------------
-st.subheader("Contact Ratio by session_week")
-
-# Convert session_week to string to ensure no decimals when zooming
-grouped_df['WeekStr'] = grouped_df['session_week'].astype(int).astype(str)
-
+# Plot the weekly contact ratio
 st.line_chart(
-    data=grouped_df,
+    data=weekly_df,
     x='WeekStr',
     y='contact_ratio',
     height=400
 )
 
-st.markdown("""
-**Interpretation:**
-- The x-axis shows each `session_week` as a category (string), so no decimals appear.
-- The y-axis is the aggregated contact ratio, where each point represents 
-  the combined daily data for that week.
-""")
+# --------------------------------------------------------------------
+# 5. DATE-WISE AGGREGATION & CHART
+# --------------------------------------------------------------------
+st.subheader("2) Date-wise Contact Ratio Chart")
+
+# Now we group by session_date to get a separate point for each calendar day
+daily_df = filtered_df.groupby('session_date', as_index=False).agg(
+    sum_session=('session_count', 'sum'),
+    avg_week_txn=('week_txn_counts', 'mean')
+)
+
+# Calculate contact ratio for each date
+daily_df['contact_ratio'] = (
+    1_000_000 * daily_df['sum_session'] / daily_df['avg_week_txn']
+)
+
+# Sort dates
+daily_df.sort_values(by='session_date', ascending=False, inplace=True)
+
+# Plot date-wise contact ratio
+# We can keep session_date as a date for the x-axis to show real calendar dates
+st.line_chart(
+    data=daily_df,
+    x='session_date',
+    y='contact_ratio',
+    height=400
+)
+
+# --------------------------------------------------------------------
+# 6. TABULAR VIEWS
+# --------------------------------------------------------------------
+
+st.subheader("Weekly & Daily Data Tables")
+
+# Remove columns, display tables in a vertical layout
+st.write("**Weekly Aggregation**")
+st.dataframe(weekly_df)
+
+st.write("**Daily Aggregation**")
+st.dataframe(daily_df)
