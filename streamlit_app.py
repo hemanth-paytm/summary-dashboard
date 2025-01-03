@@ -13,10 +13,10 @@ def load_data():
     df = pd.read_csv(DATA_FILENAME)
     
     # Convert session_date to datetime
-    #df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce')
+    df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce')
 
     # Convert session_date to date
-    df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce').dt.date
+    #df['session_date'] = pd.to_datetime(df['session_date'], errors='coerce').dt.date
 
     # Convert key columns from string to numeric if needed
     df['session_month'] = pd.to_numeric(df['session_month'], errors='coerce')
